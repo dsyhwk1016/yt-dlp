@@ -1236,6 +1236,7 @@ from .naver import (
     NaverIE,
     NaverLiveIE,
     NaverNowIE,
+    NaverBlogIE
 )
 from .nba import (
     NBAIE,

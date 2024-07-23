@@ -129,7 +129,7 @@ class NaverBaseIE(InfoExtractor):
 
 
 class NaverIE(NaverBaseIE):
-    _VALID_URL = r'https?://(?:m\.)?tv(?:cast)?\.naver\.com/(?:v|embed)/(?P<id>\d+)'
+    _VALID_URL = r'https?://(?:m\.)?tv(?:cast)?\.naver\.com/(?:v|embed|h)/(?P<id>\d+)'
     _GEO_BYPASS = False
     _TESTS = [{
         'url': 'http://tv.naver.com/v/81652',
@@ -402,3 +402,49 @@ class NaverNowIE(NaverBaseIE):
         return self.playlist_result(
             itertools.chain(self._extract_show_replays(show_id), self._extract_show_highlights(show_id)),
             show_id, show_info.get('title'))
+
+class NaverBlogIE(NaverBaseIE):
+    _VALID_URL = r'https?://(?:m\.)?blog\.naver\.com/(?P<blogid>[^/]+)/clip/(?P<id>\d+)'
+    _GEO_BYPASS = False
+
+    def _real_extract(self, url):
+        blog_id = self._match_valid_url(url).group('blogid')
+        video_id = self._match_valid_url(url).group('id')
+        
+        moment_request = urllib.request.Request(f"https://api-moment.blog.naver.com/blogs/{blog_id}/momentVideoId/{video_id}", headers={"Referer": f"https://m.blog.naver.com/{blog_id}/clip/{video_id}"})
+        with urllib.request.urlopen(moment_request) as response:
+            html = response.read()
+            decoded_html = html.decode('utf-8')
+            vid = json.loads(decoded_html)["result"]["videoId"]
+
+        media_request = urllib.request.Request(f"https://m.naver.com/shorts/?mediaId={vid}&serviceType=MOMENT&recType=MOMENT")
+        with urllib.request.urlopen(media_request) as response:
+            html = response.read()
+            decoded_html = html.decode('utf-8')
+
+            pattern = re.compile(r'<script[^>]*>window\.\$\_\_videoMeta\s*=\s(.*?)</script>')
+            match = pattern.search(decoded_html)
+            card = json.loads(match.group(1))["card"]
+            content = card["content"]
+
+            api_list = content["vod"]["playback"]["meta"]["apiList"]
+            count_api_url = next((item for item in api_list if item["name"] in ["count", "share"]), None)["source"]
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(count_api_url).query)
+            in_key = query["key"]
+
+        if not vid or not in_key:
+            raise ExtractorError('Unable to extract video info')
+
+        info = self._extract_video_info(video_id, vid, in_key)
+        info.update({'title': content["title"],
+            'description': content["description"],
+            'timestamp': parse_iso8601(content["publishedAt"]),
+            'duration': content["vod"]["playback"]["videos"]["list"][0]["duration"],
+            'like_count': card["interaction"]["emotion"]["reactions"][0]["count"],
+            'view_count': content["vod"]["count"],
+            'comment_count': card["interaction"]["comment"]["count"],
+            'uploader': content["customInfo"]["blogName"],
+            'uploader_id': content["customInfo"]["domainIdOrBlogId"],
+            'uploader_url': card["interaction"]["subscription"]["homePcUrl"]
+        })
+        return info
