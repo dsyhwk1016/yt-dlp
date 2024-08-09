@@ -59,7 +59,8 @@ class InstagramBaseIE(InfoExtractor):
             self._LOGIN_URL, None, note='Downloading login webpage', errnote='Failed to download login webpage')
         
         csrf_token = re.search(r'csrf_token":"(.*?)"', login_webpage).group(1)
-        rollout_hash = re.search(r'rollout_hash":"(.*?)"', login_webpage).group(1)
+        rollout_hash = int(re.search(r'rollout_hash":"(.*?)"', login_webpage).group(1))
+        print(csrf_token, rollout_hash)
 
         login = self._download_json(
             f'{self._LOGIN_URL}/ajax/', None, note='Logging in', headers={
