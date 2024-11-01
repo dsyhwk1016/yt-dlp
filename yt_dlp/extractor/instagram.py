@@ -428,6 +428,7 @@ class InstagramIE(InstagramBaseIE):
             'parent_comment_count': 24,
             'has_threaded_comments': True,
         }
+        print(video_id)
         general_info = self._download_json(
             'https://www.instagram.com/graphql/query/', video_id, fatal=False, errnote=False,
             headers={
@@ -438,6 +439,7 @@ class InstagramIE(InstagramBaseIE):
             }, query={
                 'query_hash': '9f8827793ef34641b2fb195d4d41151c',
                 'variables': json.dumps(variables, separators=(',', ':')),
+                "doc_id": "8845758582119845"
             })
         media.update(traverse_obj(general_info, ('data', 'shortcode_media')) or {})
 
